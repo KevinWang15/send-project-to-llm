@@ -1,0 +1,15 @@
+{
+  "name": "send-my-project-to-llm",
+  "version": "1.0.0",
+  "description": "",
+  "bin": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "clipboardy": "^2.0.0",
+    "minimatch": "^10.0.1",
+    "yargs": "^17.7.2"
+  },
+  "license": "MIT"
+}
