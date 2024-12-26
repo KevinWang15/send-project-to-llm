@@ -26,7 +26,25 @@ const builtInExclusions = [
     "**/bin/**",
     "**/obj/**",
     "**/tmp/**",
-    "**/temp/**"
+    "**/temp/**",
+    "**/package-lock.json",
+    "**/yarn.lock",
+    "**/pnpm-lock.yaml",
+    "**/.env",
+    "**/.env.*",
+    "**/.DS_Store",
+    "**/coverage/**",
+    "**/.next/**",
+    "**/.nuxt/**",
+    "**/vendor/**",
+    "**/*.min.js",
+    "**/*.min.css",
+    "**/Thumbs.db",
+    "**/.sass-cache/**",
+    "**/bower_components/**",
+    "**/.cache/**",
+    "**/logs/**",
+    "**/*.log"
 ];
 
 const argv = yargs(hideBin(process.argv))
