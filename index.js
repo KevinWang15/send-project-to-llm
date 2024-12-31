@@ -44,7 +44,8 @@ const builtInExclusions = [
     "**/bower_components/**",
     "**/.cache/**",
     "**/logs/**",
-    "**/*.log"
+    "**/*.log",
+    "**/zz_*.go"
 ];
 
 const argv = yargs(hideBin(process.argv))
