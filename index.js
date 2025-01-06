@@ -1,16 +1,15 @@
 #!/usr/bin/env node
 "use strict";
 
-const fs = require("fs").promises;
+const fs = require("fs");
 const path = require("path");
 const yargs = require("yargs/yargs");
-const {hideBin} = require("yargs/helpers");
+const { hideBin } = require("yargs/helpers");
 const clipboardy = require("clipboardy");
-const {minimatch} = require("minimatch");
+const { minimatch } = require("minimatch");
+const ignore = require("ignore");
 
-// Built-in exclusions (directories/files to ignore).
-// These are now interpreted as glob patterns. For example, to ensure
-// any "node_modules" directory at any level is excluded, we can use "**/node_modules/**".
+// Built-in exclusions (glob patterns).
 const builtInExclusions = [
     "**/node_modules/**",
     "**/__pycache__/**",
@@ -98,21 +97,48 @@ const argv = yargs(hideBin(process.argv))
 const rootDir = path.resolve(argv.dir);
 const extensions = argv.ext;
 const userExclusions = argv.exclude || [];
-const excludePatterns = [...builtInExclusions, ...userExclusions];
 const includePrompt = argv["include-prompt"];
+
+// 1) Combine built-in exclusions with userExclusions:
+const excludePatterns = [...builtInExclusions, ...userExclusions];
+
+// 2) Read .gitignore and initialize ignore instance:
+let gitignoreInstance = ignore();
+try {
+    const gitignorePath = path.join(rootDir, ".gitignore");
+    const gitignoreContent = fs.readFileSync(gitignorePath, "utf8");
+    gitignoreInstance = ignore().add(gitignoreContent);
+} catch (err) {
+    if (err.code !== "ENOENT") {
+        console.warn(`Error reading .gitignore: ${err.message}`);
+    }
+    // If there's no .gitignore, or can't read it, we simply ignore the error
+    // and proceed with no .gitignore-based exclusion.
+}
 
 let collectedContent = "";
 
+// This function checks if a file should be excluded by either:
+// - builtInExclusions + userExclusions (via minimatch)
+// - .gitignore patterns (via ignore library)
 function matchesExclusion(relativePath) {
-    // Check if the relative path matches any exclusion pattern.
-    // The "dot: true" option ensures patterns match dotfiles and directories.
-    return excludePatterns.some((pattern) => minimatch(relativePath, pattern, {dot: true}));
+    // 1) Check custom + built-in patterns via minimatch
+    const matchedByCustomPattern = excludePatterns.some((pattern) =>
+        minimatch(relativePath, pattern, { dot: true })
+    );
+
+    // 2) Check .gitignore patterns
+    //    The ignore library expects a path relative to the root
+    //    If matched, it means .gitignore says "ignore" this path
+    const matchedByGitignore = gitignoreInstance.ignores(relativePath);
+
+    return matchedByCustomPattern || matchedByGitignore;
 }
 
 async function findAndPrintFiles(dir) {
     let entries;
     try {
-        entries = await fs.readdir(dir, {withFileTypes: true});
+        entries = await fs.promises.readdir(dir, { withFileTypes: true });
     } catch (err) {
         console.error(`Error reading directory ${dir}: ${err.message}`);
         return;
@@ -122,7 +148,7 @@ async function findAndPrintFiles(dir) {
         const fullPath = path.join(dir, entry.name);
         const relativePath = path.relative(rootDir, fullPath);
 
-        // Check exclusions using the relative path
+        // Exclude if it matches any exclusion pattern
         if (matchesExclusion(relativePath)) {
             continue;
         }
@@ -139,7 +165,7 @@ async function findAndPrintFiles(dir) {
 
 async function appendFileContent(filePath) {
     try {
-        const content = await fs.readFile(filePath, "utf8");
+        const content = await fs.promises.readFile(filePath, "utf8");
         const relativePath = path.relative(rootDir, filePath);
         const fileOutput = `\n=== ${relativePath} ===\n\n${content}\n`;
         collectedContent += fileOutput;
