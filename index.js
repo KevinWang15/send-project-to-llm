@@ -48,7 +48,7 @@ const builtInExclusions = [
 ];
 
 const argv = yargs(hideBin(process.argv))
-    .usage("Usage: $0 --dir <directory> --ext <extension> [--ext <extension> ...]")
+    .usage("Usage: $0 --dir <directory> [--ext <extension> ...] [--include <filename> ...]")
     .option("dir", {
         alias: "d",
         type: "string",
@@ -59,7 +59,11 @@ const argv = yargs(hideBin(process.argv))
         alias: "e",
         type: "array",
         describe: "File extensions to include (e.g. .sh, .go, .yaml, .yml)",
-        demandOption: true
+    })
+    .option("include", {
+        alias: "i",
+        type: "array",
+        describe: "Specific filenames to include (e.g., Dockerfile, Makefile)",
     })
     .option("exclude", {
         alias: "x",
@@ -76,26 +80,29 @@ const argv = yargs(hideBin(process.argv))
         if (typeof args.dir !== "string" || args.dir.trim().length === 0) {
             throw new Error("You must provide a valid directory path.");
         }
-        // Validate extensions
-        if (!Array.isArray(args.ext) || args.ext.length === 0) {
-            throw new Error("You must provide at least one file extension.");
+        // Validate that at least one of --ext or --include is provided
+        if ((!args.ext || args.ext.length === 0) && (!args.include || args.include.length === 0)) {
+            throw new Error("You must provide at least one extension (--ext) or filename (--include).");
         }
         // Check that all provided extensions start with a dot, e.g. ".sh"
-        const invalidExt = args.ext.find((e) => !e.startsWith("."));
-        if (invalidExt) {
-            throw new Error(`Invalid extension "${invalidExt}". Extensions should start with a '.'`);
+        if (args.ext) {
+            const invalidExt = args.ext.find((e) => !e.startsWith("."));
+            if (invalidExt) {
+                throw new Error(`Invalid extension "${invalidExt}". Extensions should start with a '.'`);
+            }
         }
         return true;
     })
     .example('$0 --dir ./ --ext .sh --ext .go', 'Collect all .sh and .go files under the current directory.')
-    .example('$0 --dir /path/to/project --ext .yaml --ext .yml', 'Collect all .yaml and .yml files in the given project directory.')
-    .example("$0 --dir ./ --ext .js --exclude '**/dist/**' --exclude '*.test.js'", 'Exclude "dist" directories anywhere and any ".test.js" files.')
-    .example('$0 --dir ./ --ext .js --include-prompt', 'Prepend the LLM prompt to the output.')
+    .example('$0 --dir ./ --include Dockerfile --include Makefile', 'Collect all Dockerfile and Makefile files.')
+    .example('$0 --dir ./ --ext .yaml --include Dockerfile', 'Collect all .yaml files and Dockerfiles.')
+    .example("$0 --dir ./ --ext .js --exclude '**/dist/**' --include Makefile", 'Collect .js files and Makefiles, excluding "dist" directories.')
     .help()
     .argv;
 
 const rootDir = path.resolve(argv.dir);
-const extensions = argv.ext;
+const extensions = argv.ext || [];
+const includeFiles = argv.include || [];
 const userExclusions = argv.exclude || [];
 const includePrompt = argv["include-prompt"];
 
@@ -156,7 +163,10 @@ async function findAndPrintFiles(dir) {
         if (entry.isDirectory()) {
             await findAndPrintFiles(fullPath);
         } else if (entry.isFile()) {
-            if (extensions.some((ext) => entry.name.endsWith(ext))) {
+            const matchesExtension = extensions.some((ext) => entry.name.endsWith(ext));
+            const matchesInclude = includeFiles.some((filename) => entry.name === filename);
+
+            if (matchesExtension || matchesInclude) {
                 await appendFileContent(fullPath);
             }
         }
