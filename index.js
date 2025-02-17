@@ -4,9 +4,9 @@
 const fs = require("fs");
 const path = require("path");
 const yargs = require("yargs/yargs");
-const { hideBin } = require("yargs/helpers");
+const {hideBin} = require("yargs/helpers");
 const clipboardy = require("clipboardy");
-const { minimatch } = require("minimatch");
+const {minimatch} = require("minimatch");
 const ignore = require("ignore");
 
 // Built-in exclusions (glob patterns).
@@ -131,7 +131,7 @@ let collectedContent = "";
 function matchesExclusion(relativePath) {
     // 1) Check custom + built-in patterns via minimatch
     const matchedByCustomPattern = excludePatterns.some((pattern) =>
-        minimatch(relativePath, pattern, { dot: true })
+        minimatch(relativePath, pattern, {dot: true})
     );
 
     // 2) Check .gitignore patterns
@@ -145,7 +145,7 @@ function matchesExclusion(relativePath) {
 async function findAndPrintFiles(dir) {
     let entries;
     try {
-        entries = await fs.promises.readdir(dir, { withFileTypes: true });
+        entries = await fs.promises.readdir(dir, {withFileTypes: true});
     } catch (err) {
         console.error(`Error reading directory ${dir}: ${err.message}`);
         return;
@@ -164,7 +164,9 @@ async function findAndPrintFiles(dir) {
             await findAndPrintFiles(fullPath);
         } else if (entry.isFile()) {
             const matchesExtension = extensions.some((ext) => entry.name.endsWith(ext));
-            const matchesInclude = includeFiles.some((filename) => entry.name === filename);
+            const matchesInclude = includeFiles.some((pattern) => {
+                return path.resolve(path.join(entry.path, entry.name)) === path.resolve(pattern) || minimatch(path.join(entry.path, entry.name), pattern, {dot: true});
+            });
 
             if (matchesExtension || matchesInclude) {
                 await appendFileContent(fullPath);
